@@ -2,7 +2,7 @@
   "name": "mcp-server-fireflies",
   "description": "MCP server for interacting with Fireflies.ai API",
   "version": "1.0.0",
-  "author": "Your Organization",
+  "author": "Jason Berlinsky",
   "repoUrl": "https://github.com/your-org/mcp-server-fireflies",
   "credentialRequirements": [
     {
@@ -16,4 +16,4 @@
     "name": "mcp-server-fireflies",
     "path": "dist/index.js"
   }
-} 
+}
