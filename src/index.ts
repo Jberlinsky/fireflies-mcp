@@ -10,6 +10,7 @@ import {
   Tool,
   CallToolResult,
 } from "@modelcontextprotocol/sdk/types.js";
+import { FIREFLIES_MCP_SERVER_VERSION } from "./version.js";
 import { z } from 'zod';
 import axios from 'axios';
 
@@ -110,7 +111,7 @@ class FirefliesApiClient {
     try {
       // Log to stderr to avoid breaking MCP protocol
       process.stderr.write(`Executing GraphQL query with variables: ${JSON.stringify(variables)}\n`);
-      
+
       const response = await axios.post(
         this.baseUrl,
         { query, variables },
@@ -133,12 +134,12 @@ class FirefliesApiClient {
     } catch (error) {
       if (axios.isAxiosError(error)) {
         process.stderr.write(`API request failed: ${error.message}\n`);
-        
+
         if (error.response) {
           process.stderr.write(`Response status: ${error.response.status}\n`);
           process.stderr.write(`Response data: ${JSON.stringify(error.response.data)}\n`);
         }
-        
+
         if (error.code === 'ECONNABORTED') {
           throw new McpError(
             ErrorCode.InternalError,
@@ -167,12 +168,12 @@ class FirefliesApiClient {
   async getTranscripts(limit?: number, fromDate?: string, toDate?: string, minimal: boolean = false): Promise<any[]> {
     // Set a reasonable default limit if not provided
     const actualLimit = limit || 20;
-    
+
     process.stderr.write(`Getting transcripts with limit: ${actualLimit}, fromDate: ${fromDate || 'not specified'}, toDate: ${toDate || 'not specified'}, minimal: ${minimal}\n`);
-    
+
     // Use a more optimized query with fewer fields to reduce response size
     let query;
-    
+
     if (minimal) {
       // Super minimal query for fallback
       query = `
@@ -249,33 +250,33 @@ class FirefliesApiClient {
 
     process.stderr.write(`Executing getTranscripts query with variables: ${JSON.stringify(variables)}\n`);
     const startTime = Date.now();
-    
+
     try {
       const data = await this.executeQuery(query, variables);
       const endTime = Date.now();
       process.stderr.write(`getTranscripts query completed in ${endTime - startTime}ms\n`);
-      
+
       const transcripts = data.transcripts || [];
       process.stderr.write(`Retrieved ${transcripts.length} transcripts\n`);
-      
+
       if (transcripts.length <= 1) {
         process.stderr.write(`WARNING: Only ${transcripts.length} transcript(s) returned. This might be due to:\n`);
         process.stderr.write(`1. Limited data in your Fireflies account\n`);
         process.stderr.write(`2. Date filters restricting results\n`);
         process.stderr.write(`3. API permissions or visibility settings\n`);
       }
-      
+
       return transcripts;
     } catch (error) {
       process.stderr.write(`Error in getTranscripts: ${error instanceof Error ? error.message : String(error)}\n`);
-      
+
       // If this wasn't already a minimal query and we got a timeout, try again with minimal fields
-      if (!minimal && error instanceof Error && 
+      if (!minimal && error instanceof Error &&
           (error.message.includes('timeout') || error.message.includes('ECONNABORTED'))) {
         process.stderr.write(`Retrying with minimal fields...\n`);
         return this.getTranscripts(actualLimit, fromDate, toDate, true);
       }
-      
+
       throw error;
     }
   }
@@ -377,21 +378,21 @@ class FirefliesApiClient {
       process.stderr.write(`Getting transcript details for ID: ${transcriptId}\n`);
       const data = await this.executeQuery(query, variables);
       const transcript = data.transcript;
-      
+
       if (!transcript) {
         throw new McpError(ErrorCode.InvalidParams, `Transcript with ID ${transcriptId} not found`);
       }
-      
+
       // If formatText is true, format the sentences as a simple string
       if (formatText && transcript.sentences && transcript.sentences.length > 0) {
         // Create a formatted text version of the transcript
         const formattedText = transcript.sentences.map((sentence: any) => {
           return `${sentence.speaker_name}: ${sentence.text}`;
         }).join('\n');
-        
+
         // Replace the sentences array with the formatted text
         transcript.formatted_text = formattedText;
-        
+
         // Keep a minimal version of sentences for reference
         transcript.sentences = transcript.sentences.map((sentence: any) => ({
           index: sentence.index,
@@ -399,7 +400,7 @@ class FirefliesApiClient {
           text: sentence.text
         }));
       }
-      
+
       return transcript;
     } catch (error) {
       process.stderr.write(`Error getting transcript details: ${error instanceof Error ? error.message : String(error)}\n`);
@@ -444,7 +445,7 @@ class FirefliesApiClient {
 
     // Set a reasonable default limit if not provided
     const actualLimit = limit || 20;
-    
+
     process.stderr.write(`Searching transcripts with query: "${searchQuery}", limit: ${actualLimit}, fromDate: ${fromDate || 'not specified'}, toDate: ${toDate || 'not specified'}\n`);
 
     // Prepare variables
@@ -470,15 +471,15 @@ class FirefliesApiClient {
     try {
       process.stderr.write(`Executing searchTranscripts query...\n`);
       const startTime = Date.now();
-      
+
       const data = await this.executeQuery(query, variables);
-      
+
       const endTime = Date.now();
       process.stderr.write(`searchTranscripts query completed in ${endTime - startTime}ms\n`);
-      
+
       const transcripts = data.transcripts || [];
       process.stderr.write(`Found ${transcripts.length} matching transcripts\n`);
-      
+
       return transcripts;
     } catch (error) {
       process.stderr.write(`Error in searchTranscripts: ${error instanceof Error ? error.message : String(error)}\n`);
@@ -511,18 +512,18 @@ class FirefliesApiClient {
       process.stderr.write(`Generating summary for transcript ID: ${transcriptId}\n`);
       const data = await this.executeQuery(query, variables);
       const transcript = data.transcript;
-      
+
       // Extract the summary based on the requested format
       if (!transcript || !transcript.summary) {
         throw new McpError(ErrorCode.InvalidParams, 'Summary not available for this transcript');
       }
-      
+
       // Log the summary structure to help with debugging
       process.stderr.write(`Summary structure: ${JSON.stringify(transcript.summary)}\n`);
-      
+
       // Helper function to safely check if a field is an array
       const isArray = (field: any): boolean => Array.isArray(field);
-      
+
       // Helper function to safely join array elements or handle non-array values
       const safeJoin = (field: any, separator: string): string => {
         if (isArray(field)) {
@@ -534,15 +535,15 @@ class FirefliesApiClient {
         }
         return '';
       };
-      
+
       if (format === 'bullet_points') {
         // Return bullet point format
         const bullets = [];
-        
+
         if (transcript.summary.overview) {
           bullets.push(`Overview: ${transcript.summary.overview}`);
         }
-        
+
         // Safely handle action_items which might not be an array
         if (transcript.summary.action_items) {
           if (isArray(transcript.summary.action_items) && transcript.summary.action_items.length > 0) {
@@ -555,7 +556,7 @@ class FirefliesApiClient {
             bullets.push(`- ${transcript.summary.action_items}`);
           }
         }
-        
+
         // Safely handle topics_discussed which might not be an array
         if (transcript.summary.topics_discussed) {
           if (isArray(transcript.summary.topics_discussed) && transcript.summary.topics_discussed.length > 0) {
@@ -568,7 +569,7 @@ class FirefliesApiClient {
             bullets.push(`- ${transcript.summary.topics_discussed}`);
           }
         }
-        
+
         // Safely handle keywords which might not be an array
         if (transcript.summary.keywords) {
           if (isArray(transcript.summary.keywords) && transcript.summary.keywords.length > 0) {
@@ -577,31 +578,31 @@ class FirefliesApiClient {
             bullets.push(`Keywords: ${transcript.summary.keywords}`);
           }
         }
-        
+
         return bullets.join('\n');
       } else {
         // Return paragraph format
         let summary = '';
-        
+
         if (transcript.summary.overview) {
           summary += transcript.summary.overview + ' ';
         }
-        
+
         // Safely handle topics_discussed
         if (transcript.summary.topics_discussed) {
           summary += 'Topics discussed include: ' + safeJoin(transcript.summary.topics_discussed, '; ') + '. ';
         }
-        
+
         // Safely handle action_items
         if (transcript.summary.action_items) {
           summary += 'Action items include: ' + safeJoin(transcript.summary.action_items, '; ') + '. ';
         }
-        
+
         // Safely handle keywords
         if (transcript.summary.keywords) {
           summary += 'Key topics: ' + safeJoin(transcript.summary.keywords, ', ') + '.';
         }
-        
+
         return summary;
       }
     } catch (error) {
@@ -627,7 +628,7 @@ class FirefliesServer {
     this.server = new Server(
       {
         name: "fireflies-mcp-server",
-        version: "1.0.0",
+        version: FIREFLIES_MCP_SERVER_VERSION,
       },
       {
         capabilities: {
@@ -670,7 +671,7 @@ class FirefliesServer {
     }));
 
     // Handle tool calls
-    this.server.setRequestHandler(CallToolRequestSchema, async (request) => 
+    this.server.setRequestHandler(CallToolRequestSchema, async (request) =>
       this.handleToolCall(request.params.name, request.params.arguments ?? {})
     );
   }
@@ -684,23 +685,23 @@ class FirefliesServer {
         case "fireflies_get_transcripts": {
           const { limit, from_date, to_date } = args;
           process.stderr.write(`Handling fireflies_get_transcripts with args: ${JSON.stringify(args)}\n`);
-          
+
           try {
             // Create a promise that will timeout after 90 seconds
             const timeoutPromise = new Promise<never>((_, reject) => {
               setTimeout(() => reject(new Error('Request timed out after 90 seconds')), 90000);
             });
-            
+
             // Race the actual API call against the timeout
             const transcripts = await Promise.race([
               this.apiClient.getTranscripts(limit, from_date, to_date),
               timeoutPromise
             ]);
-            
+
             process.stderr.write(`Successfully retrieved ${transcripts.length} transcripts\n`);
-            
+
             let resultText = JSON.stringify(transcripts, null, 2);
-            
+
             // Add helpful message if only a few results were returned
             if (transcripts.length <= 1) {
               resultText += `\n\nNote: Only ${transcripts.length} transcript(s) were found. This might be due to:
@@ -713,7 +714,7 @@ To retrieve more transcripts, you can:
 - Increase the limit parameter (default is 20)
 - Check your Fireflies account permissions and settings`;
             }
-            
+
             return {
               toolResult: {
                 content: [{
@@ -724,16 +725,16 @@ To retrieve more transcripts, you can:
             };
           } catch (error) {
             process.stderr.write(`Error in fireflies_get_transcripts: ${error instanceof Error ? error.message : String(error)}\n`);
-            
+
             // If we hit a timeout, try with minimal fields
             if (error instanceof Error && error.message.includes('timeout')) {
               process.stderr.write(`Trying with minimal fields due to timeout...\n`);
               const minimalTranscripts = await this.apiClient.getTranscripts(limit, from_date, to_date, true);
-              
+
               let resultText = JSON.stringify(minimalTranscripts, null, 2);
-              
+
               // Add helpful message
-              resultText += `\n\nNote: Due to timeout, only minimal transcript data was retrieved. 
+              resultText += `\n\nNote: Due to timeout, only minimal transcript data was retrieved.
 For more details, try requesting specific transcripts using their IDs.
 
 If you're only seeing a few results, this might be due to:
@@ -745,7 +746,7 @@ To retrieve more transcripts, you can:
 - Specify a wider date range using from_date and to_date parameters
 - Increase the limit parameter (default is 20)
 - Check your Fireflies account permissions and settings`;
-              
+
               return {
                 toolResult: {
                   content: [{
@@ -755,7 +756,7 @@ To retrieve more transcripts, you can:
                 }
               };
             }
-            
+
             // Re-throw if it's not a timeout
             throw error;
           }
@@ -763,50 +764,50 @@ To retrieve more transcripts, you can:
 
         case "fireflies_get_transcript_details": {
           const { transcript_id } = args;
-          
+
           if (!transcript_id) {
             throw new McpError(
               ErrorCode.InvalidParams,
               'transcript_id parameter is required'
             );
           }
-          
+
           process.stderr.write(`Getting transcript details for ID: ${transcript_id}\n`);
-          
+
           try {
             // Get the transcript with formatted text
             const transcript = await this.apiClient.getTranscriptDetails(transcript_id, true);
-            
+
             // Create a more readable output
             let resultText = `Title: ${transcript.title}\n`;
             resultText += `Date: ${transcript.dateString}\n`;
             resultText += `Duration: ${Math.floor(transcript.duration / 60)}m ${Math.floor(transcript.duration % 60)}s\n`;
-            
+
             if (transcript.participants && transcript.participants.length > 0) {
               resultText += `Participants: ${transcript.participants.join(', ')}\n`;
             }
-            
+
             resultText += `\n--- Transcript ---\n\n`;
-            
+
             // Use the formatted text if available
             if (transcript.formatted_text) {
               resultText += transcript.formatted_text;
             } else {
               // Fallback to formatting the sentences array
-              resultText += transcript.sentences.map((sentence: any) => 
+              resultText += transcript.sentences.map((sentence: any) =>
                 `${sentence.speaker_name}: ${sentence.text}`
               ).join('\n');
             }
-            
+
             // Add summary if available
             if (transcript.summary) {
               resultText += `\n\n--- Summary ---\n\n`;
-              
+
               if (transcript.summary.overview) {
                 resultText += `Overview: ${transcript.summary.overview}\n\n`;
               }
-              
-              if (transcript.summary.action_items && Array.isArray(transcript.summary.action_items) && 
+
+              if (transcript.summary.action_items && Array.isArray(transcript.summary.action_items) &&
                   transcript.summary.action_items.length > 0) {
                 resultText += `Action Items:\n`;
                 transcript.summary.action_items.forEach((item: string) => {
@@ -814,13 +815,13 @@ To retrieve more transcripts, you can:
                 });
                 resultText += '\n';
               }
-              
-              if (transcript.summary.keywords && Array.isArray(transcript.summary.keywords) && 
+
+              if (transcript.summary.keywords && Array.isArray(transcript.summary.keywords) &&
                   transcript.summary.keywords.length > 0) {
                 resultText += `Keywords: ${transcript.summary.keywords.join(', ')}\n`;
               }
             }
-            
+
             return {
               toolResult: {
                 content: [{
@@ -831,11 +832,11 @@ To retrieve more transcripts, you can:
             };
           } catch (error) {
             process.stderr.write(`Error in fireflies_get_transcript_details: ${error instanceof Error ? error.message : String(error)}\n`);
-            
+
             if (error instanceof McpError) {
               throw error;
             }
-            
+
             throw new McpError(
               ErrorCode.InternalError,
               `Error retrieving transcript details: ${error instanceof Error ? error.message : String(error)}`
@@ -845,22 +846,22 @@ To retrieve more transcripts, you can:
 
         case "fireflies_search_transcripts": {
           const { query, limit, from_date, to_date } = args;
-          
+
           if (!query) {
             throw new McpError(
               ErrorCode.InvalidParams,
               'query parameter is required'
             );
           }
-          
+
           process.stderr.write(`Searching transcripts with query: "${query}", limit: ${limit || 'default'}, from_date: ${from_date || 'not specified'}, to_date: ${to_date || 'not specified'}\n`);
-          
+
           try {
             const transcripts = await this.apiClient.searchTranscripts(query, limit, from_date, to_date);
-            
+
             // Create a more readable output
             let resultText = `Found ${transcripts.length} matching transcripts for query: "${query}"\n\n`;
-            
+
             if (transcripts.length === 0) {
               resultText += `No transcripts found matching your search criteria. Try:\n`;
               resultText += `- Using different search terms\n`;
@@ -872,23 +873,23 @@ To retrieve more transcripts, you can:
                 resultText += `   ID: ${transcript.id}\n`;
                 resultText += `   Date: ${transcript.dateString}\n`;
                 resultText += `   Duration: ${Math.floor(transcript.duration / 60)}m ${Math.floor(transcript.duration % 60)}s\n`;
-                
+
                 if (transcript.summary && transcript.summary.overview) {
                   resultText += `   Overview: ${transcript.summary.overview}\n`;
                 }
-                
-                if (transcript.summary && transcript.summary.keywords && 
-                    Array.isArray(transcript.summary.keywords) && 
+
+                if (transcript.summary && transcript.summary.keywords &&
+                    Array.isArray(transcript.summary.keywords) &&
                     transcript.summary.keywords.length > 0) {
                   resultText += `   Keywords: ${transcript.summary.keywords.join(', ')}\n`;
                 }
-                
+
                 resultText += `\n`;
               });
-              
+
               resultText += `To view the full transcript, use the fireflies_get_transcript_details tool with the transcript ID.`;
             }
-            
+
             return {
               toolResult: {
                 content: [{
@@ -899,11 +900,11 @@ To retrieve more transcripts, you can:
             };
           } catch (error) {
             process.stderr.write(`Error in fireflies_search_transcripts: ${error instanceof Error ? error.message : String(error)}\n`);
-            
+
             if (error instanceof McpError) {
               throw error;
             }
-            
+
             throw new McpError(
               ErrorCode.InternalError,
               `Error searching transcripts: ${error instanceof Error ? error.message : String(error)}`
@@ -913,19 +914,19 @@ To retrieve more transcripts, you can:
 
         case "fireflies_generate_summary": {
           const { transcript_id, format = 'bullet_points' } = args;
-          
+
           if (!transcript_id) {
             throw new McpError(
               ErrorCode.InvalidParams,
               'transcript_id parameter is required'
             );
           }
-          
+
           process.stderr.write(`Generating summary for transcript ID: ${transcript_id} with format: ${format}\n`);
-          
+
           try {
             const summary = await this.apiClient.generateTranscriptSummary(transcript_id, format);
-            
+
             return {
               toolResult: {
                 content: [{
@@ -936,9 +937,9 @@ To retrieve more transcripts, you can:
             };
           } catch (error) {
             process.stderr.write(`Error generating summary: ${error instanceof Error ? error.message : String(error)}\n`);
-            
+
             // If the error is related to missing summary data, provide a helpful message
-            if (error instanceof McpError && 
+            if (error instanceof McpError &&
                 error.message.includes('Summary not available')) {
               return {
                 toolResult: {
@@ -957,7 +958,7 @@ You can try:
                 }
               };
             }
-            
+
             // For other errors, re-throw
             throw error;
           }
@@ -971,11 +972,11 @@ You can try:
       }
     } catch (error) {
       process.stderr.write(`Error in handleToolCall for ${name}: ${error instanceof Error ? error.message : String(error)}\n`);
-      
+
       if (error instanceof McpError) {
         throw error;
       }
-      
+
       // Ensure we're returning a proper McpError
       if (error instanceof Error) {
         throw new McpError(
@@ -1016,7 +1017,7 @@ You can try:
 // Main execution
 async function main() {
   const server = new FirefliesServer();
-  
+
   try {
     await server.start();
   } catch (error) {
@@ -1028,4 +1029,4 @@ async function main() {
 main().catch((error) => {
   process.stderr.write(`Fatal server error: ${error instanceof Error ? error.message : String(error)}\n`);
   process.exit(1);
-}); 
+});

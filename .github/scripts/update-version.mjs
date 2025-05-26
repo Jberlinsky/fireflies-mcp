@@ -28,8 +28,8 @@ async function updateVersion(newVersion) {
   // src/version.ts
   const versionTsData = await fs.readFile(files.versionTs, 'utf8');
   const updatedVersionTsData = versionTsData.replace(
-    /const LINE_BOT_MCP_SERVER_VERSION = ".*?";/,
-    `const LINE_BOT_MCP_SERVER_VERSION = "${newVersion}";`
+    /const FIREFLIES_MCP_SERVER_VERSION = ".*?";/,
+    `const FIREFLIES_MCP_SERVER_VERSION = "${newVersion}";`
   );
   await fs.writeFile(files.versionTs, updatedVersionTsData);
 
@@ -54,7 +54,7 @@ async function verifyVersion(expectedVersion) {
 
   // src/version.ts
   const versionTsData = await fs.readFile('./src/version.ts', 'utf8');
-  if (!versionTsData.includes(`const LINE_BOT_MCP_SERVER_VERSION = "${expectedVersion}";`)) {
+  if (!versionTsData.includes(`const FIREFLIES_MCP_SERVER_VERSION = "${expectedVersion}";`)) {
     throw new Error(`src/version.ts version mismatch: expected ${expectedVersion}`);
   }
 
